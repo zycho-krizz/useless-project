@@ -2,9 +2,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Elements ---
     const routeForm = document.getElementById('route-form');
     const summaryBox = document.getElementById('summary-box');
+    const extraTimeElement = document.getElementById('extra-time');
     const peaceOfMindElement = document.getElementById('peace-of-mind');
     const avoidList = document.getElementById('avoid-list');
     const addAvoidBtn = document.getElementById('add-avoid-btn');
+    const ctaButton = document.querySelector('.cta-button');
 
     // --- State Variables ---
     let map;
@@ -12,35 +14,75 @@ document.addEventListener('DOMContentLoaded', () => {
     const peaceOfMindMessages = ["Priceless", "Mission Accomplished", "Crisis Averted", "Serenity Restored"];
 
     // --- Functions ---
-    
+
+    /**
+     * Initializes the Leaflet map.
+     */
     function initMap() {
-        map = L.map('map').setView([10.5, 76.5], 7);
+        map = L.map('map').setView([10.5, 76.5], 7); // Centered on Kerala
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-            subdomains: 'abcd', maxZoom: 20
+            subdomains: 'abcd',
+            maxZoom: 20
         }).addTo(map);
         routeLayer.addTo(map);
     }
 
+    /**
+     * Geocodes an address string to latitude and longitude using Nominatim API.
+     * @param {string} address The address to geocode.
+     * @returns {Promise<object|null>} A promise that resolves to {lat, lon} or null.
+     */
     async function geocodeAddress(address) {
         try {
-            const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`);
+            const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&countrycodes=in`);
             const data = await response.json();
             if (data && data.length > 0) {
-                return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+                return {
+                    lat: parseFloat(data[0].lat),
+                    lon: parseFloat(data[0].lon)
+                };
             }
             return null;
         } catch (error) {
             console.error("Geocoding error:", error);
+            alert("There was an error finding the address. Please try again.");
             return null;
         }
     }
 
+    /**
+     * Fetches a route from the OSRM API.
+     * @param {Array<object>} waypoints - An array of {lon, lat} objects.
+     * @returns {Promise<object|null>} A promise that resolves to the route data or null.
+     */
+    async function getRoute(waypoints) {
+        const coordsString = waypoints.map(p => `${p.lon},${p.lat}`).join(';');
+        const apiUrl = `https://router.project-osrm.org/route/v1/driving/${coordsString}?overview=full&geometries=geojson`;
+
+        try {
+            const response = await fetch(apiUrl);
+            const data = await response.json();
+            if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
+                return data.routes[0]; // Return the first route object
+            }
+            return null;
+        } catch (error) {
+            console.error("Routing error:", error);
+            return null;
+        }
+    }
+
+    /**
+     * Clears all layers from the map.
+     */
     function clearMap() {
         routeLayer.clearLayers();
     }
-    
-    // NEW FUNCTION: Handles adding a new "avoid" input field
+
+    /**
+     * Adds a new "avoid" input field to the form.
+     */
     function addAvoidInput() {
         const wrapper = document.createElement('div');
         wrapper.className = 'avoid-input-wrapper';
@@ -54,77 +96,177 @@ document.addEventListener('DOMContentLoaded', () => {
         removeBtn.type = 'button';
         removeBtn.className = 'remove-avoid-btn';
         removeBtn.textContent = 'X';
-        removeBtn.onclick = () => wrapper.remove(); // Remove the entire wrapper on click
+        removeBtn.onclick = () => wrapper.remove();
 
         wrapper.appendChild(newAvoidInput);
         wrapper.appendChild(removeBtn);
         avoidList.appendChild(wrapper);
     }
     
-    // MODIFIED FUNCTION: Now handles an array of "avoid" locations
+    /**
+     * The main function to plot the route on the map.
+     * @param {Event} event - The form submission event.
+     */
     async function plotRoute(event) {
         event.preventDefault();
         clearMap();
+        ctaButton.disabled = true;
+        ctaButton.textContent = 'Finding Path...';
 
         const startAddress = document.getElementById('start-point').value;
         const endAddress = document.getElementById('end-point').value;
-        
-        // Get all avoid inputs and create an array of their values
         const avoidInputs = document.querySelectorAll('.avoid-input');
         const avoidAddresses = Array.from(avoidInputs)
             .map(input => input.value.trim())
-            .filter(value => value !== ''); // Filter out empty strings
+            .filter(value => value !== '');
 
         if (!startAddress || !endAddress) {
             alert("Please fill in the start and end points.");
+            ctaButton.disabled = false;
+            ctaButton.textContent = 'Find a New Path';
             return;
         }
 
-        // Create an array of promises for all geocoding requests
-        const startPromise = geocodeAddress(startAddress);
-        const endPromise = geocodeAddress(endAddress);
-        const avoidPromises = avoidAddresses.map(address => geocodeAddress(address));
-
-        // Wait for all promises to resolve
-        const [startCoords, endCoords, ...avoidCoords] = await Promise.all([startPromise, endPromise, ...avoidPromises]);
+        // Geocode all addresses concurrently
+        const geocodePromises = [geocodeAddress(startAddress), geocodeAddress(endAddress), ...avoidAddresses.map(geocodeAddress)];
+        const [startCoords, endCoords, ...avoidCoordsList] = await Promise.all(geocodePromises);
 
         if (!startCoords || !endCoords) {
             alert("Could not find the start or destination. Please be more specific.");
+            ctaButton.disabled = false;
+            ctaButton.textContent = 'Find a New Path';
             return;
         }
-
-        // --- Draw on Map ---
+        
+        // Add markers for start and end
         L.marker(startCoords).addTo(routeLayer).bindPopup("Starting Point");
         L.marker(endCoords).addTo(routeLayer).bindPopup("Destination");
-        
-        // Loop through all found avoid coordinates and draw a circle for each
-        const validAvoidCoords = avoidCoords.filter(coords => coords !== null);
-        validAvoidCoords.forEach((coords, index) => {
-            L.circle(coords, {
-                color: 'red', fillColor: '#f03', fillOpacity: 0.3, radius: 5000
-            }).addTo(routeLayer).bindPopup("No-Go Zone: " + avoidAddresses[index]);
-        });
-        
-        // For the demo, the straight-line route will just use the first valid avoid point
-        const firstAvoid = validAvoidCoords[0];
-        const detourRoute = [
-            [startCoords.lat, startCoords.lon],
-            firstAvoid ? [firstAvoid.lat + 0.05, firstAvoid.lon + 0.05] : [startCoords.lat, startCoords.lon], // Simple angle
-            [endCoords.lat, endCoords.lon]
-        ];
-        
-        L.polyline(detourRoute, { color: '#ff007f', weight: 5 }).addTo(routeLayer);
 
-        map.fitBounds(L.latLngBounds(detourRoute), { padding: [50, 50] });
+        let finalRoute;
+        const validAvoidCoords = avoidCoordsList.filter(c => c !== null);
+
+        if (validAvoidCoords.length > 0) {
+            // --- DETOUR LOGIC FOR MULTIPLE POINTS (CORRECTED) ---
+            const waypoints = [startCoords];
+
+            // Draw all the "No-Go Zone" circles on the map
+            validAvoidCoords.forEach((avoidPoint, index) => {
+                L.circle(avoidPoint, {
+                    color: 'red',
+                    fillColor: '#f03',
+                    fillOpacity: 0.3,
+                    radius: 2000 // 2km radius
+                }).addTo(routeLayer).bindPopup(`No-Go Zone ${index + 1}`);
+            });
+
+            // For each point to avoid, calculate a detour waypoint and add it to our list sequentially.
+            validAvoidCoords.forEach(avoidPoint => {
+                // The "start" for this detour calculation is the *last* point we added to our route.
+                const previousWaypoint = waypoints[waypoints.length - 1];
+                
+                // Calculate detour points based on the direction from our last waypoint to the final destination.
+                const detourCandidates = calculateDetourPoints(previousWaypoint, endCoords, avoidPoint, 5000); // 5km away
+                
+                // For simplicity, we consistently pick one side for the detour.
+                waypoints.push(detourCandidates.p1);
+            });
+
+            waypoints.push(endCoords);
+
+            // Get the final route that passes through the start, all detour points, and the end.
+            finalRoute = await getRoute(waypoints);
+
+        } else {
+            // --- DIRECT ROUTE LOGIC ---
+            finalRoute = await getRoute([startCoords, endCoords]);
+        }
+
+        if (finalRoute && finalRoute.geometry) {
+            const routeGeoJSON = L.geoJSON(finalRoute.geometry, {
+                style: { color: '#ff007f', weight: 5 }
+            });
+            routeLayer.addLayer(routeGeoJSON);
+            map.fitBounds(routeGeoJSON.getBounds(), { padding: [50, 50] });
+
+            // Update summary box
+            const durationMinutes = Math.round(finalRoute.duration / 60);
+            extraTimeElement.innerHTML = `<strong>Travel Time:</strong> ${durationMinutes} minutes`;
+            const randomMessage = peaceOfMindMessages[Math.floor(Math.random() * peaceOfMindMessages.length)];
+            peaceOfMindElement.innerHTML = `<strong>Peace of Mind:</strong> ${randomMessage}`;
+            summaryBox.classList.remove('hidden');
+
+        } else {
+            alert("Could not find a route. The locations might be unreachable by car.");
+        }
         
-        const randomMessage = peaceOfMindMessages[Math.floor(Math.random() * peaceOfMindMessages.length)];
-        peaceOfMindElement.innerHTML = `<strong>Peace of Mind:</strong> ${randomMessage}`;
-        summaryBox.classList.remove('hidden');
+        ctaButton.disabled = false;
+        ctaButton.textContent = 'Find a New Path';
     }
+    
+    // --- Geospatial Helper Functions ---
+
+    function toRad(degrees) { return degrees * Math.PI / 180; }
+    function toDeg(radians) { return radians * 180 / Math.PI; }
+
+    /**
+     * Calculates two points to detour around a central avoid point.
+     * @param {object} start - {lat, lon} of start
+     * @param {object} end - {lat, lon} of end
+     * @param {object} avoid - {lat, lon} of the point to avoid
+     * @param {number} distance - The distance in meters to create the detour points away from the avoid point
+     * @returns {object} {p1, p2} containing the two detour points.
+     */
+    function calculateDetourPoints(start, end, avoid, distance) {
+        const R = 6371e3; // Earth's radius in metres
+        const bear = getBearing(start, end);
+        
+        // Calculate bearings perpendicular to the main route's bearing
+        const bear1 = (bear + 90) % 360;
+        const bear2 = (bear - 90 + 360) % 360;
+        
+        const p1 = getDestination(avoid, bear1, distance);
+        const p2 = getDestination(avoid, bear2, distance);
+
+        return { p1, p2 };
+    }
+    
+    /**
+     * Calculates the destination point given a starting point, bearing, and distance.
+     */
+    function getDestination(start, bearing, distance) {
+        const R = 6371e3; // Earth's radius in metres
+        const lat1 = toRad(start.lat);
+        const lon1 = toRad(start.lon);
+        const brng = toRad(bearing);
+
+        const lat2 = Math.asin(Math.sin(lat1) * Math.cos(distance / R) +
+            Math.cos(lat1) * Math.sin(distance / R) * Math.cos(brng));
+        let lon2 = lon1 + Math.atan2(Math.sin(brng) * Math.sin(distance / R) * Math.cos(lat1),
+            Math.cos(distance / R) - Math.sin(lat1) * Math.sin(lat2));
+
+        return { lat: toDeg(lat2), lon: toDeg(lon2) };
+    }
+    
+    /**
+     * Calculates the bearing between two points.
+     */
+    function getBearing(start, end) {
+        const lat1 = toRad(start.lat);
+        const lon1 = toRad(start.lon);
+        const lat2 = toRad(end.lat);
+        const lon2 = toRad(end.lon);
+
+        const y = Math.sin(lon2 - lon1) * Math.cos(lat2);
+        const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(lon2 - lon1);
+        const brng = Math.atan2(y, x);
+
+        return (toDeg(brng) + 360) % 360;
+    }
+
 
     // --- Event Listeners ---
     routeForm.addEventListener('submit', plotRoute);
-    addAvoidBtn.addEventListener('click', addAvoidInput); // New listener for the "add" button
+    addAvoidBtn.addEventListener('click', addAvoidInput);
 
     // --- Initial Load ---
     initMap();
