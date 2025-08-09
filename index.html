@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detour - Navigate Your Past</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <main class="main-container">
+        <aside class="sidebar">
+            <header>
+                <h1>Detour</h1>
+                <p class="tagline">Plot your escape.</p>
+            </header>
+
+            <form id="route-form">
+                <div class="input-group">
+                    <label for="start-point">Starting Point</label>
+                    <input type="text" id="start-point" placeholder="e.g., Haripad, Kerala">
+                </div>
+                <div class="input-group">
+                    <label for="end-point">Final Destination</label>
+                    <input type="text" id="end-point" placeholder="e.g., Kochi, Kerala">
+                </div>
+
+                <div id="avoid-list">
+                    <label>No-Go Zone(s) 👻</label>
+                    <div class="avoid-input-wrapper">
+                        <input type="text" class="avoid-input" placeholder="A place to avoid">
+                    </div>
+                </div>
+
+                <button type="button" id="add-avoid-btn">+ Add Avoid Zone</button>
+                <button type="submit" class="cta-button">Find a New Path</button>
+            </form>
+
+            <div id="a-box" class="hidden">
+                <h2>Your Detour is Ready.</h2>
+                <ul>
+                    <li id="extra-time"><strong>Extra Time:</strong> +12 minutes</li>
+                    <li id="peace-of-mind"><strong>Peace of Mind:</strong> Priceless</li>
+                </ul>
+            </div>
+        </aside>
+
+        <section class="map-container">
+            <div id="map"></div>
+            <div id="view-switcher">
+                <button id="normal-view-btn" class="active">Normal</button>
+                <button id="satellite-view-btn">Satellite</button>
+            </div>
+        </section>
+
+    </main>
+
+    <script src="script.js"></script>
+</body>
+</html>
