@@ -25,27 +25,3 @@ This project was built as a proof-of-concept to demonstrate how multiple user-de
 * [**Leaflet.js**](https://leafletjs.com/): An open-source JavaScript library for mobile-friendly interactive maps.
 * [**Nominatim API**](https://nominatim.openstreetmap.org/): A free tool to search OpenStreetMap data by address and convert it to geographic coordinates.
 
-### Getting Started
-
-To get a local copy up and running, follow these simple steps.
-
-1.  **Clone the repo**
-    ```sh
-    git clone [https://github.com/your_username/detour.git](https://github.com/your_username/detour.git)
-    ```
-2.  **Navigate to the project directory**
-    ```sh
-    cd detour
-    ```
-3.  **Open `index.html` in your browser**
-    You can simply double-click the file or use a live server extension in your code editor (like VS Code's Live Server) for the best experience.
-
-### ⚠️ Important Note: Demo Routing Logic
-
-The route-plotting logic in this project is for **demonstration purposes only**. It does **not** calculate a real, drivable detour using a road network.
-
-The current implementation simply draws a straight line that "bends" around the first specified "No-Go Zone." To make this a fully functional application, the placeholder logic in `script.js` would need to be replaced with a call to a proper routing engine API (like OSRM, GraphHopper, or a commercial provider) that supports avoid-area parameters.
-
-### License
-
-Distributed under the MIT License. See `LICENSE` for more information.
