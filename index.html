@@ -17,17 +17,17 @@
         <aside class="sidebar">
             <header>
                 <h1>Detour</h1>
-                <p class="tagline">Plot your escape.</p>
+                <p class="tagline">Navigate your past.</p>
             </header>
 
             <form id="route-form">
                 <div class="input-group">
                     <label for="start-point">Starting Point</label>
-                    <input type="text" id="start-point" placeholder="e.g., Haripad, Kerala">
+                    <input type="text" id="start-point" placeholder="e.g., Thiruvananthapuram">
                 </div>
                 <div class="input-group">
                     <label for="end-point">Final Destination</label>
-                    <input type="text" id="end-point" placeholder="e.g., Kochi, Kerala">
+                    <input type="text" id="end-point" placeholder="e.g., Kochi">
                 </div>
 
                 <div id="avoid-list">
@@ -41,23 +41,16 @@
                 <button type="submit" class="cta-button">Find a New Path</button>
             </form>
 
-            <div id="a-box" class="hidden">
+            <div id="summary-box" class="hidden">
                 <h2>Your Detour is Ready.</h2>
                 <ul>
-                    <li id="extra-time"><strong>Extra Time:</strong> +12 minutes</li>
+                    <li id="extra-time"><strong>Travel Time:</strong> 12 minutes</li>
                     <li id="peace-of-mind"><strong>Peace of Mind:</strong> Priceless</li>
                 </ul>
             </div>
         </aside>
 
-        <section class="map-container">
-            <div id="map"></div>
-            <div id="view-switcher">
-                <button id="normal-view-btn" class="active">Normal</button>
-                <button id="satellite-view-btn">Satellite</button>
-            </div>
-        </section>
-
+        <section id="map"></section>
     </main>
 
     <script src="script.js"></script>
