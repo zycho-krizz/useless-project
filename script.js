@@ -146,7 +146,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const validAvoidCoords = avoidCoordsList.filter(c => c !== null);
 
         if (validAvoidCoords.length > 0) {
-            // --- DETOUR LOGIC FOR MULTIPLE POINTS (CORRECTED) ---
+            // --- DETOUR LOGIC FOR MULTIPLE POINTS (SMARTER & SORTED) ---
+            
+            // Sort the avoid coordinates by their distance from the start point
+            validAvoidCoords.sort((a, b) => {
+                const distA = getDistance(startCoords, a);
+                const distB = getDistance(startCoords, b);
+                return distA - distB;
+            });
+            
             const waypoints = [startCoords];
 
             // Draw all the "No-Go Zone" circles on the map
@@ -159,16 +167,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 }).addTo(routeLayer).bindPopup(`No-Go Zone ${index + 1}`);
             });
 
-            // For each point to avoid, calculate a detour waypoint and add it to our list sequentially.
+            // For each point to avoid, calculate a smarter detour waypoint and add it to our list sequentially.
             validAvoidCoords.forEach(avoidPoint => {
-                // The "start" for this detour calculation is the *last* point we added to our route.
                 const previousWaypoint = waypoints[waypoints.length - 1];
                 
-                // Calculate detour points based on the direction from our last waypoint to the final destination.
-                const detourCandidates = calculateDetourPoints(previousWaypoint, endCoords, avoidPoint, 5000); // 5km away
+                // **FIX:** Increase distance to 7.5km for a wider berth
+                const detourCandidates = calculateDetourPoints(previousWaypoint, endCoords, avoidPoint, 7500);
                 
-                // For simplicity, we consistently pick one side for the detour.
-                waypoints.push(detourCandidates.p1);
+                // **FIX:** Intelligently choose the better side (p1 or p2) by comparing path distances
+                const cost1 = getDistance(previousWaypoint, detourCandidates.p1) + getDistance(detourCandidates.p1, endCoords);
+                const cost2 = getDistance(previousWaypoint, detourCandidates.p2) + getDistance(detourCandidates.p2, endCoords);
+
+                if (cost1 <= cost2) {
+                    waypoints.push(detourCandidates.p1);
+                } else {
+                    waypoints.push(detourCandidates.p2);
+                }
             });
 
             waypoints.push(endCoords);
@@ -196,7 +210,7 @@ document.addEventListener('DOMContentLoaded', () => {
             summaryBox.classList.remove('hidden');
 
         } else {
-            alert("Could not find a route. The locations might be unreachable by car.");
+            alert("Could not find a route. The locations might be unreachable by car or the detour is too complex.");
         }
         
         ctaButton.disabled = false;
@@ -207,6 +221,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function toRad(degrees) { return degrees * Math.PI / 180; }
     function toDeg(radians) { return radians * 180 / Math.PI; }
+    
+    /**
+     * Calculates the distance between two lat/lon points using the Haversine formula.
+     * @param {object} p1 - {lat, lon} of point 1.
+     * @param {object} p2 - {lat, lon} of point 2.
+     * @returns {number} The distance in metres.
+     */
+    function getDistance(p1, p2) {
+        const R = 6371e3; // metres
+        const φ1 = toRad(p1.lat);
+        const φ2 = toRad(p2.lat);
+        const Δφ = toRad(p2.lat - p1.lat);
+        const Δλ = toRad(p2.lon - p1.lon);
+
+        const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+                  Math.cos(φ1) * Math.cos(φ2) *
+                  Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+        return R * c;
+    }
+
 
     /**
      * Calculates two points to detour around a central avoid point.
